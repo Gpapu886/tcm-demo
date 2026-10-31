@@ -43,7 +43,7 @@
 | TonguExpert | 复旦现代人类学重点实验室 + 中科院上海营养与健康所（Phenomics 2025） | 人工筛选金标准 1747 张 |
 
 ## 快速开始
-```bash
+
 # 1. 安装依赖
 pip install -r requirements.txt
 
@@ -70,11 +70,9 @@ tcm-demo/
 
 
 ## 说明
+本项目为工程化演示，仅供技术展示，不构成临床诊疗建议。
 
-本项目为硕士毕业设计《基于多模态融合大模型的中医辅助诊疗系统研究》的工程化演示，仅供技术展示，不构成临床诊疗建议。
-
-**② `requirements.txt`（放 tcm-demo 根目录）**
-```txt
+② requirements.txt
 fastapi>=0.100.0
 uvicorn>=0.23.0
 python-multipart>=0.0.6
@@ -82,4 +80,3 @@ onnxruntime>=1.16.0
 opencv-python>=4.8.0
 numpy>=1.24.0
 requests>=2.31.0
-```
