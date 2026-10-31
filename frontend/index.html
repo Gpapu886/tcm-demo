@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中医多模态辅助诊疗DEMO</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Microsoft Yahei", sans-serif; }
+        body { background: #f5f7fa; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; display: flex; gap: 20px; }
+        .left { flex: 1; background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .right { flex: 1; background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        h1 { font-size: 22px; color: #2c3e50; margin-bottom: 20px; text-align: center; }
+        h2 { font-size: 16px; color: #34495e; margin: 16px 0 10px; border-left: 4px solid #3498db; padding-left: 8px; }
+        
+        .upload-area { border: 2px dashed #bdc3c7; border-radius: 8px; padding: 30px; text-align: center; margin-bottom: 16px; cursor: pointer; transition: 0.3s; }
+        .upload-area:hover { border-color: #3498db; background: #f8f9fa; }
+        #imgPreview { max-width: 100%; max-height: 300px; margin-top: 10px; border-radius: 6px; display: none; }
+        
+        textarea { width: 100%; height: 100px; padding: 10px; border: 1px solid #dcdfe6; border-radius: 6px; resize: none; font-size: 14px; margin-bottom: 16px; }
+        button { width: 100%; padding: 12px; background: #3498db; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #2980b9; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+
+        .img-box { position: relative; margin-bottom: 16px; }
+        #resultImg { max-width: 100%; border-radius: 6px; }
+        
+        .attr-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        .attr-tag { padding: 4px 10px; background: #ecf0f1; border-radius: 20px; font-size: 13px; color: #2c3e50; }
+        
+        .syn-card { padding: 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #3498db; background: #f8f9fa; }
+        .syn-card.top1 { border-left-color: #27ae60; background: #eafaf1; }
+        .syn-name { font-size: 15px; font-weight: bold; color: #2c3e50; margin-bottom: 4px; }
+        .conf-bar { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+        .conf-fill { height: 100%; background: #3498db; border-radius: 4px; transition: width 0.5s; }
+        .syn-card.top1 .conf-fill { background: #27ae60; }
+
+        .suggestion { padding: 12px; border-radius: 6px; margin-top: 16px; font-weight: bold; text-align: center; }
+        .suggestion.high { background: #eafaf1; color: #27ae60; border: 1px solid #27ae60; }
+        .suggestion.low { background: #fdf0f0; color: #e74c3c; border: 1px solid #e74c3c; }
+
+        .loading { text-align: center; padding: 40px; color: #7f8c8d; }
+    </style>
+</head>
+<body>
+    <h1>中医多模态辅助诊疗系统 · U-CMEA证据融合版</h1>
+    <div class="container">
+        <!-- 左侧：输入区 -->
+        <div class="left">
+            <h2>输入信息</h2>
+            <div class="upload-area" onclick="document.getElementById('imgInput').click()">
+                <p>点击上传舌象图</p>
+                <input type="file" id="imgInput" accept="image/*" style="display: none;">
+                <img id="imgPreview" alt="预览">
+            </div>
+            
+            <h2>症状/病历描述</h2>
+            <textarea id="symptomInput" placeholder="请输入症状描述，例如：患者神疲乏力，食少纳呆，腹胀便溏，舌体胖大边有齿痕，苔白腻...">
+患者神疲乏力，食少纳呆，腹胀便溏，肢体困重，舌淡胖，苔白腻，脉濡缓。
+            </textarea>
+            
+            <button id="analyzeBtn" onclick="doAnalyze()">开始分析</button>
+        </div>
+
+        <!-- 右侧：结果区 -->
+        <div class="right">
+            <h2>舌象检测结果</h2>
+            <div class="img-box">
+                <canvas id="resultCanvas" style="max-width: 100%; border-radius: 6px; display: none;"></canvas>
+                <p id="imgPlaceholder" style="color: #95a5a6; text-align: center; padding: 40px;">上传舌图后显示检测结果</p>
+            </div>
+            <div class="attr-list" id="attrList"></div>
+
+            <h2>融合诊断结果</h2>
+            <div id="resultArea">
+                <p style="color: #95a5a6; text-align: center; padding: 20px;">点击开始分析后显示结果</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const imgInput = document.getElementById('imgInput');
+        const imgPreview = document.getElementById('imgPreview');
+        const canvas = document.getElementById('resultCanvas');
+        const ctx = canvas.getContext('2d');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+
+        // 图片预览
+        imgInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                imgPreview.src = ev.target.result;
+                imgPreview.style.display = 'block';
+            }
+            reader.readAsDataURL(file);
+        });
+
+        // 画检测框
+        function drawBoxes(imgSrc, boxes) {
+            const img = new Image();
+            img.onload = function() {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                
+                const colors = {
+                    "hongshe": "#e74c3c", "zishe": "#9b59b6", "pangdashe": "#f39c12",
+                    "shoushe": "#3498db", "hongdianshe": "#e67e22", "liewenshe": "#95a5a6",
+                    "chihenshe": "#1abc9c", "baitaishe": "#ecf0f1", "huangtaishe": "#f1c40f"
+                };
+                const cnMap = {
+                    "hongshe": "红舌", "zishe": "紫舌", "pangdashe": "胖大舌",
+                    "shoushe": "瘦舌", "hongdianshe": "红点舌", "liewenshe": "裂纹舌",
+                    "chihenshe": "齿痕舌", "baitaishe": "白苔", "huangtaishe": "黄苔"
+                };
+
+                boxes.forEach(box => {
+                    const color = colors[box.cls] || "#3498db";
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(box.x1, box.y1, box.x2 - box.x1, box.y2 - box.y1);
+                    
+                    ctx.fillStyle = color;
+                    const label = `${cnMap[box.cls]} ${box.conf}`;
+                    ctx.font = "12px sans-serif";
+                    const tw = ctx.measureText(label).width;
+                    ctx.fillRect(box.x1, box.y1 - 18, tw + 6, 18);
+                    ctx.fillStyle = "white";
+                    ctx.fillText(label, box.x1 + 3, box.y1 - 5);
+                });
+                canvas.style.display = 'block';
+                document.getElementById('imgPlaceholder').style.display = 'none';
+            }
+            img.src = imgSrc;
+        }
+
+        async function doAnalyze() {
+            const file = imgInput.files[0];
+            const symptom = document.getElementById('symptomInput').value.trim();
+            if (!file) { alert("请先上传舌象图"); return; }
+            if (!symptom) { alert("请输入症状描述"); return; }
+
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerText = "分析中...";
+            document.getElementById('resultArea').innerHTML = '<div class="loading">正在进行多模态融合分析...</div>';
+
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('symptom', symptom);
+
+            try {
+              const resp = await fetch('/api/analyze', { method: 'POST', body: formData });
+              const res = await resp.json();
+              if (res.code !== 200) {
+                     alert(res.msg || "分析失败");
+                     analyzeBtn.disabled = false;
+                     analyzeBtn.innerText = "开始分析";
+                     return;
+              }
+              const data = res.data;
+                
+                // 画检测框
+                const reader = new FileReader();
+                reader.onload = e => drawBoxes(e.target.result, data.visual.boxes);
+                reader.readAsDataURL(file);
+
+                // 显示属性标签
+                const attrList = document.getElementById('attrList');
+                attrList.innerHTML = '';
+                Object.entries(data.visual.attributes).forEach(([name, conf]) => {
+                    const tag = document.createElement('div');
+                    tag.className = 'attr-tag';
+                    tag.innerText = `${name} ${(conf*100).toFixed(1)}%`;
+                    attrList.appendChild(tag);
+                });
+
+                // 显示诊断结果
+                const resultArea = document.getElementById('resultArea');
+                let html = '';
+                data.arbitration.top3.forEach((item, idx) => {
+                    const isTop = idx === 0 ? 'top1' : '';
+                    html += `
+                        <div class="syn-card ${isTop}">
+                            <div class="syn-name">${idx+1}. ${item.syndrome} ${isTop ? '(最终输出)' : ''}</div>
+                            <div class="conf-bar"><div class="conf-fill" style="width: ${item.conf*100}%"></div></div>
+                            <div style="font-size: 12px; color: #7f8c8d; margin-top: 4px;">置信度 ${(item.conf*100).toFixed(2)}%</div>
+                        </div>
+                    `;
+                });
+                html += `<div class="suggestion ${data.arbitration.confidence_level}">
+                    ${data.arbitration.suggestion}（证据不确定度：${data.arbitration.u_alea}）
+                </div>`;
+                resultArea.innerHTML = html;
+
+            } catch (e) {
+                alert("分析失败：" + e.message);
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerText = "开始分析";
+            }
+        }
+    </script>
+</body>
+</html>
